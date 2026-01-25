@@ -8,6 +8,7 @@ use tauri::Manager;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
@@ -21,7 +22,9 @@ fn main() {
             println!("Resource path: {:?}", resource_path);
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![services::get_server_path,])
+        .invoke_handler(tauri::generate_handler![
+            services::get_resources_folder_path,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
