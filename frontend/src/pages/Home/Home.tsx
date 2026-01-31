@@ -5,65 +5,49 @@ import {
   MonthMarker,
 } from '@/components/Media/ChronologicalGallery';
 import TimelineScrollbar from '@/components/Timeline/TimelineScrollbar';
-import { MediaView } from '@/components/Media/MediaView';
 import { Image } from '@/types/Media';
 import { setImages } from '@/features/imageSlice';
-import { showLoader, hideLoader } from '@/features/loaderSlice';
-import { selectImages, selectIsImageViewOpen } from '@/features/imageSelectors';
+import { selectImages } from '@/features/imageSelectors';
 import { usePictoQuery } from '@/hooks/useQueryExtension';
 import { fetchAllImages } from '@/api/api-functions';
 import { RootState } from '@/app/store';
-import { showInfoDialog } from '@/features/infoDialogSlice';
 import { EmptyGalleryState } from '@/components/EmptyStates/EmptyGalleryState';
+import { useMutationFeedback } from '@/hooks/useMutationFeedback';
 
 export const Home = () => {
   const dispatch = useDispatch();
-  const isImageViewOpen = useSelector(selectIsImageViewOpen);
   const images = useSelector(selectImages);
   const scrollableRef = useRef<HTMLDivElement>(null);
   const [monthMarkers, setMonthMarkers] = useState<MonthMarker[]>([]);
-
   const searchState = useSelector((state: RootState) => state.search);
   const isSearchActive = searchState.active;
-  const searchResults = searchState.images;
 
-  const { data, isLoading, isSuccess, isError } = usePictoQuery({
+  const { data, isLoading, isSuccess, isError, error } = usePictoQuery({
     queryKey: ['images'],
-    queryFn: fetchAllImages,
+    queryFn: () => fetchAllImages(),
     enabled: !isSearchActive,
   });
 
-  // Handle fetching lifecycle
+  useMutationFeedback(
+    { isPending: isLoading, isSuccess, isError, error },
+    {
+      loadingMessage: 'Loading images',
+      showSuccess: false,
+      errorTitle: 'Error',
+      errorMessage: 'Failed to load images. Please try again later.',
+    },
+  );
+
   useEffect(() => {
-    if (!isSearchActive) {
-      if (isLoading) {
-        dispatch(showLoader('Loading images'));
-      } else if (isError) {
-        dispatch(hideLoader());
-        dispatch(
-          showInfoDialog({
-            title: 'Error',
-            message: 'Failed to load images. Please try again later.',
-            variant: 'error',
-          }),
-        );
-      } else if (isSuccess) {
-        const images = data?.data as Image[];
-        dispatch(setImages(images));
-        dispatch(hideLoader());
-      }
+    if (!isSearchActive && isSuccess) {
+      const images = data?.data as Image[];
+      dispatch(setImages(images));
     }
-  }, [data, isSuccess, isError, isLoading, dispatch, isSearchActive]);
-
-  const handleCloseMediaView = () => {
-    // MediaView will handle closing via Redux
-  };
-
-  const displayImages = isSearchActive ? searchResults : images;
+  }, [data, isSuccess, dispatch, isSearchActive]);
 
   const title =
-    isSearchActive && searchResults.length > 0
-      ? `Face Search Results (${searchResults.length} found)`
+    isSearchActive && images.length > 0
+      ? `Face Search Results (${images.length} found)`
       : 'Image Gallery';
 
   return (
@@ -73,9 +57,9 @@ export const Home = () => {
         ref={scrollableRef}
         className="hide-scrollbar flex-1 overflow-x-hidden overflow-y-auto"
       >
-        {displayImages.length > 0 ? (
+        {images.length > 0 ? (
           <ChronologicalGallery
-            images={displayImages}
+            images={images}
             showTitle={true}
             title={title}
             onMonthOffsetsChange={setMonthMarkers}
@@ -93,11 +77,6 @@ export const Home = () => {
           monthMarkers={monthMarkers}
           className="absolute top-0 right-0 h-full w-4"
         />
-      )}
-
-      {/* Media viewer modal */}
-      {isImageViewOpen && (
-        <MediaView images={displayImages} onClose={handleCloseMediaView} />
       )}
     </div>
   );
